@@ -73,3 +73,18 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Python
+__pycache__/
+venv/
+*.npy
+*.h5
+
+# React Native
+node_modules/
+android/build/
+android/.gradle/
+ios/build/
+
+# OS rác
+.DS_Store
