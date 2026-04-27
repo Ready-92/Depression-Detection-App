@@ -1,6 +1,9 @@
 import os
 import gc
 
+# BÙA CHÚ BẮT BUỘC: Ép TensorFlow dùng Keras 2 để đọc được file .h5 cũ
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
+
 # Tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -8,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
 
-# Gọi TensorFlow chính hãng ra
+# Gọi TensorFlow ra sau khi đã yểm bùa
 import tensorflow as tf
 
 # Ép chạy đơn luồng tiết kiệm RAM tối đa
@@ -23,10 +26,10 @@ model = None
 try:
     model_path = "depression_lstm_model.h5"
     if os.path.exists(model_path):
-        # Nạp mô hình Keras H5 trực tiếp
+        # Nạp mô hình Keras H5
         model = tf.keras.models.load_model(model_path)
-        print("[OK] Keras H5 model loaded successfully!")
-        gc.collect() # Dọn rác ngay lập tức
+        print("[OK] Keras H5 model loaded successfully with Legacy Keras!")
+        gc.collect() # Dọn rác
     else:
         print(f"[x] File not found: {model_path}")
 except Exception as e:
@@ -49,7 +52,7 @@ def preprocess_input(features, max_len=300, feat_dim=161):
 
 @app.get("/")
 async def root():
-    return {"message": "Server AI (TF-CPU + H5 Mode) dang chay!"}
+    return {"message": "Server AI (TF-CPU + Legacy H5 Mode) dang chay!"}
 
 @app.post("/predict")
 async def predict_depression(data: FeatureData):
