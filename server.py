@@ -19,11 +19,12 @@ app = FastAPI()
 model = None
 
 try:
-    model_path = "depression_lstm_model.h5"
+    # ĐÃ SỬA THÀNH ĐUÔI .keras Ở ĐÂY NÈ
+    model_path = "depression_lstm_model.keras"
     if os.path.exists(model_path):
-        # THÊM compile=False LÀ CHÌA KHÓA VÀNG VƯỢT LỖI
+        # Vẫn giữ bùa chú compile=False 
         model = tf.keras.models.load_model(model_path, compile=False)
-        print("[OK] Keras H5 model loaded successfully!")
+        print("[OK] Keras model loaded successfully!")
         gc.collect() # Dọn rác
     else:
         print(f"[x] File not found: {model_path}")
