@@ -1,5 +1,6 @@
 fastapi
 uvicorn
 tensorflow
+tf-keras
 numpy<2.0.0
 python-multipart
