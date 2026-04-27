@@ -8,8 +8,13 @@ import {
   type CameraRef,
 } from 'react-native-vision-camera';
 
+// Thay link này bằng link "Forwarding" mà Ngrok cấp cho bạn khi chạy lệnh
+// Ví dụ: https://abcd-123-456.ngrok-free.app
+const NGROK_URL = 'https://dipteral-eleanor-ungrainable.ngrok-free.dev';
+const SERVER_URL = `${NGROK_URL}/predict`;
+
 export default function App() {
-  // Quyền camera (API v5)
+  // Quyền camera
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front'); // Dùng camera trước
   const camera = useRef<CameraRef>(null);
@@ -24,35 +29,38 @@ export default function App() {
     }
   }, [hasPermission, requestPermission]);
 
-  // Hàm chụp ảnh và gửi lên Backend (API v5)
+  // Hàm chụp ảnh và gửi lên Backend
   const captureAndSend = async () => {
     try {
-      // 1. Chụp ảnh bằng photoOutput
+      // 1. Chụp ảnh ra file
       const photoFile = await photoOutput.capturePhotoToFile(
         { flashMode: 'off' },
         {},
       );
       console.log('Đã chụp ảnh lưu tại:', photoFile.filePath);
 
-      // 2. Tạm thời gửi dữ liệu số (Mock Data) lên để test AI Server trước
+      // 2. Tạo FormData để gửi ảnh lên Server
+      const formData = new FormData();
+      formData.append('file', {
+        uri: `file://${photoFile.filePath}`,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
+      } as any);
+
+      // 3. Gọi API Server
       console.log('Đang gọi AI Server...');
-      const mockFrame = Array.from({ length: 161 }, () => Math.random());
-
-      // QUAN TRỌNG: Sửa dòng này thành IP WiFi của máy tính bạn!
-      const SERVER_URL = 'http://10.0.2.2:8000/predict';
-
       const response = await fetch(SERVER_URL, {
         method: 'POST',
+        body: formData,
         headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
+          'Content-Type': 'multipart/form-data',
         },
-        body: JSON.stringify({ features: [mockFrame] }),
       });
 
+      console.log('Status Code:', response.status);
       const result = await response.json();
 
-      // 3. Hiện kết quả ra màn hình App
+      // 4. Hiện kết quả ra màn hình App
       Alert.alert(
         'Kết quả từ AI: ' + result.prediction,
         `Độ tin cậy: ${result.confidence}\n\nLời khuyên: ${result.advice}`,
@@ -61,7 +69,7 @@ export default function App() {
       console.error('Lỗi trong quá trình chụp hoặc gọi API:', error);
       Alert.alert(
         'Lỗi kết nối',
-        'Không thể gọi tới Server. Hãy kiểm tra lại IP.',
+        'Không thể gọi tới Server. Hãy kiểm tra lại Ngrok đã bật chưa và link đã đúng chưa.',
       );
     }
   };
