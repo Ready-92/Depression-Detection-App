@@ -1,5 +1,5 @@
 fastapi
 uvicorn
-tensorflow>=2.16.1
-numpy<2.0.0
+tflite-runtime
+numpy
 python-multipart
