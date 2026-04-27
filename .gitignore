@@ -91,3 +91,7 @@ ios/build/
 
 # Cho phép file model đi lên GitHub
 !*.h5
+!*.tflite
+
+# Script convert chi chay local
+convert_to_tflite.py
