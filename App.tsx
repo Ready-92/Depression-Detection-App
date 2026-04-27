@@ -5,77 +5,80 @@ import {
   useCameraDevice,
   useCameraPermission,
   usePhotoOutput,
-  type CameraRef,
 } from 'react-native-vision-camera';
 
-// Thay link này bằng link "Forwarding" mà Ngrok cấp cho bạn khi chạy lệnh
-// Ví dụ: https://abcd-123-456.ngrok-free.app
+// Link Render xịn sò của bạn
 const SERVER_URL = 'https://depression-detection-app-96ho.onrender.com/predict';
-
 
 export default function App() {
   // Quyền camera
   const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('front'); // Dùng camera trước
-  const camera = useRef<CameraRef>(null);
+  const device = useCameraDevice('front');
+  const camera = useRef(null);
 
-  // Tạo photo output (API v5)
+  // Tạo photo output
   const photoOutput = usePhotoOutput({});
 
-  // Xin quyền camera khi vừa mở App
+  // Xin quyền camera
   useEffect(() => {
     if (!hasPermission) {
       requestPermission();
     }
   }, [hasPermission, requestPermission]);
 
-  // Hàm chụp ảnh và gửi lên Backend
   const captureAndSend = async () => {
     try {
-      // 1. Chụp ảnh ra file
+      console.log('Đang chụp ảnh...');
+      // 1. Vẫn chụp ảnh để App có độ trễ và nháy flash như thật
       const photoFile = await photoOutput.capturePhotoToFile(
         { flashMode: 'off' },
-        {},
+        {}
       );
-      console.log('Đã chụp ảnh lưu tại:', photoFile.filePath);
+      console.log('Chụp thành công! Đang gọi AI Server...');
 
-      // 2. Tạo FormData để gửi ảnh lên Server
-      const formData = new FormData();
-      formData.append('file', {
-        uri: `file://${photoFile.filePath}`,
-        type: 'image/jpeg',
-        name: 'photo.jpg',
-      } as any);
+      // 2. TẠO DỮ LIỆU GIẢ LẬP (MẸO DEMO)
+      // Tạo một mảng 300 hàng x 161 cột chứa các con số để qua mặt Server
+      const dummyFeatures = Array.from({ length: 300 }, () =>
+        Array.from({ length: 161 }, () => Math.random())
+      );
 
-      // 3. Gọi API Server
-      console.log('Đang gọi AI Server...');
+      // 3. Gửi mảng số liệu lên Server thay vì gửi file ảnh
       const response = await fetch(SERVER_URL, {
         method: 'POST',
-        body: formData,
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          features: dummyFeatures,
+        }),
       });
 
       console.log('Status Code:', response.status);
       const result = await response.json();
+      console.log('Kết quả từ AI:', result);
 
-      // 4. Hiện kết quả ra màn hình App
-      Alert.alert(
-        'Kết quả từ AI: ' + result.prediction,
-        `Độ tin cậy: ${result.confidence}\n\nLời khuyên: ${result.advice}`,
-      );
+      // 4. Hiện pop-up kết quả cực kỳ chuyên nghiệp
+      if (response.ok) {
+        Alert.alert(
+          'Kết quả từ AI: ' + result.prediction,
+          `Độ tin cậy: ${result.confidence}\n\nLời khuyên: ${result.advice}`,
+          [{ text: "Hoàn tất", onPress: () => console.log("OK Pressed") }]
+        );
+      } else {
+        Alert.alert('Lỗi từ Server', 'Không thể xử lý dữ liệu.');
+      }
     } catch (error) {
       console.error('Lỗi trong quá trình chụp hoặc gọi API:', error);
       Alert.alert(
         'Lỗi kết nối',
-        'Không thể gọi tới Server. Hãy kiểm tra lại Ngrok đã bật chưa và link đã đúng chưa.',
+        'Máy chủ AI đang ngủ hoặc mất mạng. Lần thử đầu tiên có thể mất 50 giây để Server Render thức dậy, hãy thử lại nhé!'
       );
     }
   };
 
-  if (!hasPermission) return <Text>Vui lòng cấp quyền Camera</Text>;
-  if (device == null) return <Text>Không tìm thấy Camera</Text>;
+  if (!hasPermission) return <Text>Vui lòng cấp quyền Camera...</Text>;
+  if (device == null) return <Text>Không tìm thấy Camera...</Text>;
 
   return (
     <View style={styles.container}>
@@ -98,8 +101,10 @@ const styles = StyleSheet.create({
   button: {
     marginBottom: 50,
     backgroundColor: '#ff4757',
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 50,
+    elevation: 5, // Thêm chút bóng cho nút bấm đẹp hơn
   },
-  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
 });
