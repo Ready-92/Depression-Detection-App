@@ -78,7 +78,7 @@ yarn-error.log
 __pycache__/
 venv/
 *.npy
-*.h5
+
 
 # React Native
 node_modules/

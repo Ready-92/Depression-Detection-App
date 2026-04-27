@@ -1,26 +1,40 @@
+import os
+# 1. Tối ưu hệ thống TRƯỚC KHI import tensorflow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Chỉ hiện lỗi, tắt các log cảnh báo nặng nề
+os.environ['OTTO_MAX_THREADS'] = '1'      # Giới hạn thread để tiết kiệm RAM
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
+
+# Sử dụng tensorflow.lite nếu có thể, nhưng ở đây mình tối ưu tensorflow thường
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 
 app = FastAPI()
 
-# 1. Nạp bộ não AI đã huấn luyện
-# Đảm bảo file .h5 nằm cùng thư mục với server.py
+# 2. Cấu hình TensorFlow tiết kiệm tài nguyên
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+
+# Biến toàn cục để giữ mô hình
+model = None
+
+# Nạp mô hình một cách cẩn thận
 try:
-    model = load_model("depression_lstm_model.h5")
-    print("[\u2713] Đã nạp mô hình AI thành công!")
+    model_path = "depression_lstm_model.h5"
+    if os.path.exists(model_path):
+        # compile=False giúp nạp nhanh hơn và tốn ít RAM hơn vì không cần nạp optimizer
+        model = tf.keras.models.load_model(model_path, compile=False)
+        print("[✓] Đã nạp mô hình AI thành công!")
+    else:
+        print(f"[x] Không tìm thấy file: {model_path}")
 except Exception as e:
     print(f"[x] Lỗi nạp mô hình: {e}")
 
 class FeatureData(BaseModel):
-    # Điện thoại sẽ gửi lên một mảng các đặc trưng (features)
-    # data: List[List[float]]
     features: list 
 
 def preprocess_input(features, max_len=300, feat_dim=161):
-    """Hàm chuẩn hóa dữ liệu gửi từ điện thoại về dạng AI hiểu được"""
     matrix = np.array(features)
     curr_len = matrix.shape[0]
     
@@ -30,20 +44,24 @@ def preprocess_input(features, max_len=300, feat_dim=161):
         padding = np.zeros((max_len - curr_len, feat_dim))
         matrix = np.vstack((matrix, padding))
     
-    # Biến đổi về dạng (1, 300, 161) để đưa vào mạng LSTM
-    return np.expand_dims(matrix, axis=0)
+    return np.expand_dims(matrix, axis=0).astype(np.float32) # Ép kiểu float32 cho nhẹ
+
+@app.get("/")
+async def root():
+    return {"message": "Server AI đang chạy (Render 512MB Mode)"}
 
 @app.post("/predict")
 async def predict_depression(data: FeatureData):
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model chưa được nạp!")
+    
     try:
-        # 2. Xử lý dữ liệu đầu vào
         input_data = preprocess_input(data.features)
         
-        # 3. Cho AI dự đoán
-        prediction = model.predict(input_data)
+        # Dự đoán
+        prediction = model.predict(input_data, verbose=0) # verbose=0 để không in log khi chạy
         probability = float(prediction[0][0])
         
-        # 4. Phân loại kết quả
         status = "Trầm cảm" if probability > 0.5 else "Bình thường"
         risk_percent = f"{round(probability * 100, 2)}%"
         
@@ -58,5 +76,6 @@ async def predict_depression(data: FeatureData):
 
 if __name__ == "__main__":
     import uvicorn
-    # Sử dụng host 0.0.0.0 để điện thoại có thể kết nối vào qua mạng WiFi
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Render sẽ dùng biến môi trường PORT, nếu không có thì mặc định 8000
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
