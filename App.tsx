@@ -10,8 +10,8 @@ import {
 
 // Thay link này bằng link "Forwarding" mà Ngrok cấp cho bạn khi chạy lệnh
 // Ví dụ: https://abcd-123-456.ngrok-free.app
-const NGROK_URL = 'https://dipteral-eleanor-ungrainable.ngrok-free.dev';
-const SERVER_URL = `${NGROK_URL}/predict`;
+const SERVER_URL = 'https://depression-detection-app-96ho.onrender.com/predict';
+
 
 export default function App() {
   // Quyền camera

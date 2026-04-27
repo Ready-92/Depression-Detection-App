@@ -88,3 +88,6 @@ ios/build/
 
 # OS rác
 .DS_Store
+
+# Cho phép file model đi lên GitHub
+!*.h5
