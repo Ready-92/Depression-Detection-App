@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
 
-# Gọi TensorFlow chính hãng ra (nhưng bản CPU cho nhẹ)
+# Gọi TensorFlow chính hãng ra
 import tensorflow as tf
 
 # Ép chạy đơn luồng tiết kiệm RAM tối đa
@@ -18,22 +18,15 @@ tf.config.threading.set_intra_op_parallelism_threads(1)
 app = FastAPI()
 
 # Biến toàn cục
-interpreter = None
-input_details = None
-output_details = None
+model = None
 
 try:
-    model_path = "depression_model.tflite"
+    model_path = "depression_lstm_model.h5"
     if os.path.exists(model_path):
-        # Dùng tf.lite.Interpreter thay vì tflite_runtime
-        interpreter = tf.lite.Interpreter(model_path=model_path, num_threads=1)
-        interpreter.allocate_tensors()
-        
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        
-        print("[OK] TFLite model loaded via TF-CPU!")
-        gc.collect()
+        # Nạp mô hình Keras H5 trực tiếp
+        model = tf.keras.models.load_model(model_path)
+        print("[OK] Keras H5 model loaded successfully!")
+        gc.collect() # Dọn rác ngay lập tức
     else:
         print(f"[x] File not found: {model_path}")
 except Exception as e:
@@ -56,26 +49,24 @@ def preprocess_input(features, max_len=300, feat_dim=161):
 
 @app.get("/")
 async def root():
-    return {"message": "Server AI (TF-CPU + TFLite Mode) dang chay!"}
+    return {"message": "Server AI (TF-CPU + H5 Mode) dang chay!"}
 
 @app.post("/predict")
 async def predict_depression(data: FeatureData):
-    if interpreter is None:
+    if model is None:
         raise HTTPException(status_code=500, detail="Model chua duoc nap!")
     
     try:
         input_data = preprocess_input(data.features)
         
-        interpreter.set_tensor(input_details[0]['index'], input_data)
-        interpreter.invoke()
-        
-        prediction = interpreter.get_tensor(output_details[0]['index'])
+        # Dự đoán trực tiếp bằng model Keras
+        prediction = model.predict(input_data, verbose=0)
         probability = float(prediction[0][0])
         
         status = "Tram cam" if probability > 0.5 else "Binh thuong"
         risk_percent = f"{round(probability * 100, 2)}%"
         
-        gc.collect() # Dọn rác
+        gc.collect() # Dọn rác sau khi dự đoán
         
         return {
             "status": "success",
