@@ -1,6 +1,5 @@
---extra-index-url https://google-coral.github.io/py-repo/
 fastapi
 uvicorn
-tflite_runtime
+tflite-runtime
 numpy<2.0.0
 python-multipart
