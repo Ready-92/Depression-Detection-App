@@ -1,7 +1,7 @@
 import os
 import gc
 
-# Tắt log thừa
+# Chỉ giữ lại lệnh tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from fastapi import FastAPI, HTTPException
@@ -21,7 +21,7 @@ model = None
 try:
     model_path = "depression_lstm_model.h5"
     if os.path.exists(model_path):
-        # THÊM compile=False LÀ CHÌA KHÓA VÀNG VƯỢT LỖI
+        # compile=False LÀ CHÌA KHÓA VÀNG Ở ĐÂY
         model = tf.keras.models.load_model(model_path, compile=False)
         print("[OK] Keras H5 model loaded successfully!")
         gc.collect() # Dọn rác
