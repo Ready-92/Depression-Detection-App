@@ -8,45 +8,25 @@ from pydantic import BaseModel
 # Tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# --- CHIÊU CUỐI: CƯỠNG CHẾ ĐỔI TÊN BIẾN ĐỂ KHỚP KERAS 2 ---
-from tensorflow.keras.layers import InputLayer
-
-class PatchedInputLayer(InputLayer):
-    def __init__(self, *args, **kwargs):
-        # Đổi batch_shape (Keras 3) thành batch_input_shape (Keras 2)
-        if 'batch_shape' in kwargs:
-            kwargs['batch_input_shape'] = kwargs.pop('batch_shape')
-        kwargs.pop('optional', None)
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def from_config(cls, config):
-        if 'batch_shape' in config:
-            config['batch_input_shape'] = config.pop('batch_shape')
-        config.pop('optional', None)
-        return super(PatchedInputLayer, cls).from_config(config)
-
-# Đăng ký đè lớp InputLayer hệ thống bằng lớp Patched của mình
-tf.keras.utils.get_custom_objects().update({'InputLayer': PatchedInputLayer})
-# --------------------------------------------------------
-
 app = FastAPI()
 model = None
 
+# Cấu hình tiết kiệm RAM
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+
 try:
-    # Thử nạp .keras trước, sau đó là .h5
-    for m_file in ["depression_lstm_model.keras", "depression_lstm_model.h5"]:
-        if os.path.exists(m_file):
-            model = tf.keras.models.load_model(
-                m_file, 
-                custom_objects={'InputLayer': PatchedInputLayer}, 
-                compile=False
-            )
-            print(f"[OK] Da nap model {m_file} thanh cong!")
-            break
-    
-    if model is None:
-        print("[x] Khong tim thay file model nao!")
+    model_path = "depression_lstm_model.keras" 
+    if not os.path.exists(model_path):
+        model_path = "depression_lstm_model.h5"
+
+    if os.path.exists(model_path):
+        # TẢI MODEL CHUẨN KERAS 3 (Đã xóa bỏ custom_objects)
+        model = tf.keras.models.load_model(model_path, compile=False)
+        print(f"[OK] Da nap model {model_path} thanh cong!")
+        gc.collect()
+    else:
+        print("[x] Khong tim thay file model nao ca!")
 except Exception as e:
     print(f"[x] Loi nap model: {e}")
 
@@ -65,7 +45,7 @@ def preprocess_input(features, max_len=300, feat_dim=161):
 
 @app.get("/")
 async def root():
-    return {"message": "Server dang chay!"}
+    return {"message": "Server AI dang chay ruc ro!"}
 
 @app.post("/predict")
 async def predict_depression(data: FeatureData):
@@ -80,7 +60,7 @@ async def predict_depression(data: FeatureData):
             "status": "success",
             "prediction": status,
             "confidence": f"{round(probability * 100, 2)}%",
-            "advice": "Hay nghi ngoi nhe!" if status == "Tram cam" else "Trang thai tot!"
+            "advice": "Hay danh thoi gian nghi ngoi nhe!" if status == "Tram cam" else "Trang thai cua ban rat tot!"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
