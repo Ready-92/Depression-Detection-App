@@ -8,6 +8,24 @@ from pydantic import BaseModel
 # Tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+# --- BỘ LỌC TỪ KHÓA RÁC CHO LỚP DENSE ---
+from tensorflow.keras.layers import Dense
+
+class PatchedDense(Dense):
+    def __init__(self, *args, **kwargs):
+        # Cắt bỏ cái đuôi quantization_config vô dụng
+        kwargs.pop('quantization_config', None)
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def from_config(cls, config):
+        config.pop('quantization_config', None)
+        return super().from_config(config)
+
+# Đăng ký lớp Dense đã được "lọc" vào hệ thống
+tf.keras.utils.get_custom_objects().update({'Dense': PatchedDense})
+# ----------------------------------------
+
 app = FastAPI()
 model = None
 
@@ -21,8 +39,12 @@ try:
         model_path = "depression_lstm_model.h5"
 
     if os.path.exists(model_path):
-        # TẢI MODEL CHUẨN KERAS 3 (Đã xóa bỏ custom_objects)
-        model = tf.keras.models.load_model(model_path, compile=False)
+        # Ép nó dùng lớp Dense đã vá của mình
+        model = tf.keras.models.load_model(
+            model_path, 
+            custom_objects={'Dense': PatchedDense},
+            compile=False
+        )
         print(f"[OK] Da nap model {model_path} thanh cong!")
         gc.collect()
     else:
