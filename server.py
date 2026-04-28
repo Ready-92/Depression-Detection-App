@@ -81,7 +81,7 @@ async def predict_depression(data: FeatureData):
             "status": "success",
             "prediction": status,
             "confidence": f"{round(probability * 100, 2)}%",
-            "advice": "Hay dành thời gian để nghỉ ngơi nhé!" if status == "Trầm cảm" else "Trạng thái của bạn rấy tốt!"
+            "advice": "Hãy dành thời gian để nghỉ ngơi nhé!" if status == "Trầm cảm" else "Trạng thái của bạn rấy tốt!"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
