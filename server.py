@@ -5,45 +5,48 @@ import tensorflow as tf
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-# Tắt log thừa để Server chạy nhẹ hơn
+# Tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# --- ĐÂY LÀ "BÙA" VÁ LỖI INPUTLAYER CHO KERAS 3 ---
+# --- CHIÊU CUỐI: CƯỠNG CHẾ ĐỔI TÊN BIẾN ĐỂ KHỚP KERAS 2 ---
 from tensorflow.keras.layers import InputLayer
 
 class PatchedInputLayer(InputLayer):
-    """Tự động loại bỏ các tham số 'batch_shape' và 'optional' gây lỗi trên Keras 3"""
     def __init__(self, *args, **kwargs):
-        kwargs.pop('batch_shape', None)
+        # Đổi batch_shape (Keras 3) thành batch_input_shape (Keras 2)
+        if 'batch_shape' in kwargs:
+            kwargs['batch_input_shape'] = kwargs.pop('batch_shape')
         kwargs.pop('optional', None)
         super().__init__(*args, **kwargs)
 
-# -----------------------------------------------
+    @classmethod
+    def from_config(cls, config):
+        if 'batch_shape' in config:
+            config['batch_input_shape'] = config.pop('batch_shape')
+        config.pop('optional', None)
+        return super(PatchedInputLayer, cls).from_config(config)
+
+# Đăng ký đè lớp InputLayer hệ thống bằng lớp Patched của mình
+tf.keras.utils.get_custom_objects().update({'InputLayer': PatchedInputLayer})
+# --------------------------------------------------------
 
 app = FastAPI()
 model = None
 
-# Cấu hình tiết kiệm tài nguyên cho gói Free của Render
-tf.config.threading.set_inter_op_parallelism_threads(1)
-tf.config.threading.set_intra_op_parallelism_threads(1)
-
 try:
-    # Ưu tiên nạp file .keras trước, nếu không có thì tìm file .h5
-    model_path = "depression_lstm_model.keras" 
-    if not os.path.exists(model_path):
-        model_path = "depression_lstm_model.h5"
-
-    if os.path.exists(model_path):
-        # Ép Keras dùng PatchedInputLayer để nạp model cũ vào môi trường mới
-        model = tf.keras.models.load_model(
-            model_path, 
-            custom_objects={'InputLayer': PatchedInputLayer}, 
-            compile=False
-        )
-        print(f"[OK] Da nap model {model_path} thanh cong!")
-        gc.collect()
-    else:
-        print("[x] Khong tim thay file model nao trong thu muc!")
+    # Thử nạp .keras trước, sau đó là .h5
+    for m_file in ["depression_lstm_model.keras", "depression_lstm_model.h5"]:
+        if os.path.exists(m_file):
+            model = tf.keras.models.load_model(
+                m_file, 
+                custom_objects={'InputLayer': PatchedInputLayer}, 
+                compile=False
+            )
+            print(f"[OK] Da nap model {m_file} thanh cong!")
+            break
+    
+    if model is None:
+        print("[x] Khong tim thay file model nao!")
 except Exception as e:
     print(f"[x] Loi nap model: {e}")
 
@@ -62,7 +65,7 @@ def preprocess_input(features, max_len=300, feat_dim=161):
 
 @app.get("/")
 async def root():
-    return {"message": "Server AI dang chay ruc ro!"}
+    return {"message": "Server dang chay!"}
 
 @app.post("/predict")
 async def predict_depression(data: FeatureData):
@@ -77,7 +80,7 @@ async def predict_depression(data: FeatureData):
             "status": "success",
             "prediction": status,
             "confidence": f"{round(probability * 100, 2)}%",
-            "advice": "Hay danh thoi gian nghi ngoi nhe!" if status == "Tram cam" else "Trang thai cua ban rat tot!"
+            "advice": "Hay nghi ngoi nhe!" if status == "Tram cam" else "Trang thai tot!"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
