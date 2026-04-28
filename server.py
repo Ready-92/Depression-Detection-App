@@ -8,30 +8,28 @@ from pydantic import BaseModel
 # Tắt log thừa
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# --- BỘ LỌC TỪ KHÓA RÁC CHO LỚP DENSE ---
-from tensorflow.keras.layers import Dense
-
-class PatchedDense(Dense):
-    def __init__(self, *args, **kwargs):
-        # Cắt bỏ cái đuôi quantization_config vô dụng
-        kwargs.pop('quantization_config', None)
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def from_config(cls, config):
-        config.pop('quantization_config', None)
-        return super().from_config(config)
-
-# Đăng ký lớp Dense đã được "lọc" vào hệ thống
-tf.keras.utils.get_custom_objects().update({'Dense': PatchedDense})
-# ----------------------------------------
-
 app = FastAPI()
 model = None
 
-# Cấu hình tiết kiệm RAM
+# Cấu hình tiết kiệm RAM cho Server
 tf.config.threading.set_inter_op_parallelism_threads(1)
 tf.config.threading.set_intra_op_parallelism_threads(1)
+
+# 1. TỰ TẠO LẠI KHUNG MÔ HÌNH (Dựa 100% vào log của Việt)
+def build_model():
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import Input, Masking, LSTM, Dropout, Dense
+    
+    m = Sequential()
+    m.add(Input(shape=(300, 161)))
+    m.add(Masking(mask_value=0.0))
+    m.add(LSTM(128, return_sequences=True))
+    m.add(Dropout(0.3))
+    m.add(LSTM(64, return_sequences=False))
+    m.add(Dropout(0.3))
+    m.add(Dense(32, activation='relu'))
+    m.add(Dense(1, activation='sigmoid'))
+    return m
 
 try:
     model_path = "depression_lstm_model.keras" 
@@ -39,13 +37,14 @@ try:
         model_path = "depression_lstm_model.h5"
 
     if os.path.exists(model_path):
-        # Ép nó dùng lớp Dense đã vá của mình
-        model = tf.keras.models.load_model(
-            model_path, 
-            custom_objects={'Dense': PatchedDense},
-            compile=False
-        )
-        print(f"[OK] Da nap model {model_path} thanh cong!")
+        print("[INFO] Dang tao kien truc mo hinh...")
+        model = build_model()
+        
+        print(f"[INFO] Dang nap TRONG SO (weights) tu {model_path}...")
+        # 2. CHỈ NẠP TRỌNG SỐ (WEIGHTS) - BỎ QUA HOÀN TOÀN KHÂU ĐỌC CONFIG LỖI
+        model.load_weights(model_path)
+        
+        print(f"[OK] Da nap model thanh cong ruc ro!")
         gc.collect()
     else:
         print("[x] Khong tim thay file model nao ca!")
