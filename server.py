@@ -76,12 +76,12 @@ async def predict_depression(data: FeatureData):
         input_data = preprocess_input(data.features)
         prediction = model.predict(input_data, verbose=0)
         probability = float(prediction[0][0])
-        status = "Tram cam" if probability > 0.5 else "Binh thuong"
+        status = "Trầm cảm" if probability > 0.5 else "Bình thường"
         return {
             "status": "success",
             "prediction": status,
             "confidence": f"{round(probability * 100, 2)}%",
-            "advice": "Hay danh thoi gian nghi ngoi nhe!" if status == "Tram cam" else "Trang thai cua ban rat tot!"
+            "advice": "Hay dành thời gian để nghỉ ngơi nhé!" if status == "Trầm cảm" else "Trạng thái của bạn rấy tốt!"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
